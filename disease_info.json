@@ -1,0 +1,18 @@
+{
+    "Tomato_Bacterial_spot": {
+        "cause": "Bacterial infection caused by Xanthomonas species. Spreads through water splash and infected seeds.",
+        "prevention": "Use certified seeds, avoid overhead irrigation, apply copper-based sprays."
+    },
+    "Tomato_Early_blight": {
+        "cause": "Fungal infection caused by Alternaria solani, common in warm humid conditions.",
+        "prevention": "Crop rotation, remove infected leaves, apply fungicide regularly."
+    },
+    "Tomato_Late_blight": {
+        "cause": "Caused by Phytophthora infestans, spreads rapidly in cool wet weather.",
+        "prevention": "Ensure good air circulation, avoid excess moisture, use resistant varieties."
+    },
+    "Tomato_healthy": {
+        "cause": "No disease detected.",
+        "prevention": "Maintain proper irrigation, nutrients, and regular monitoring."
+    }
+}
