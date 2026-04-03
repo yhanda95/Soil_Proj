@@ -14,7 +14,7 @@ BAUD_RATE = 9600
 # -------------------------------
 # 🤖 LOAD MODEL
 # -------------------------------
-model = tf.keras.models.load_model("model.h5")
+model = tf.keras.models.load_model("plant_disease_model.h5")
 
 class_names = [
     "Tomato___Early_blight",
