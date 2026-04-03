@@ -1,5 +1,7 @@
-tensorflow
 streamlit
+tensorflow
 numpy
 pillow
 matplotlib
+pyserial
+opencv-python-headless
