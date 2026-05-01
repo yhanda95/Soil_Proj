@@ -38,7 +38,7 @@ idx_to_class = {v: k for k, v in class_indices.items()}
 def init_firebase():
     cred = credentials.Certificate("firebase_key.json")  # or secrets if deployed
     firebase_admin.initialize_app(cred, {
-        'databaseURL': 'YOUR_FIREBASE_URL'
+        'databaseURL': 'https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/'
     })
 
 if not firebase_admin._apps:
@@ -47,7 +47,7 @@ if not firebase_admin._apps:
 ref = db.reference('sensor')
 
 # ================= GEMINI =================
-genai.configure(api_key="YOUR_GEMINI_API_KEY")
+genai.configure(api_key="AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc")
 gemini = genai.GenerativeModel("gemini-pro")
 
 # ================= PREPROCESS =================
