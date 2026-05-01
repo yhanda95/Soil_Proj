@@ -1,7 +1,9 @@
 streamlit
 tensorflow
 numpy
+pandas
 pillow
-matplotlib
-pyserial
-opencv-python-headless
+firebase-admin
+google-generativeai
+plotly
+streamlit-autorefresh
