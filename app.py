@@ -17,10 +17,10 @@ st.set_page_config(page_title="Smart Agriculture", layout="wide")
 # 🔁 AUTO REFRESH
 st_autorefresh(interval=2000, key="refresh")
 
-# ================= LOAD MODEL =================
+# ================= LOAD MODEL (FIXED) =================
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("plant_disease_model.h5")
+    return tf.keras.models.load_model("fixed_model.h5", compile=False)
 
 model = load_model()
 
@@ -36,9 +36,9 @@ idx_to_class = {v: k for k, v in class_indices.items()}
 # ================= FIREBASE =================
 @st.cache_resource
 def init_firebase():
-    cred = credentials.Certificate("firebase_key.json")
+    cred = credentials.Certificate("firebase_key.json")  # or secrets if deployed
     firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/'
+        'databaseURL': 'YOUR_FIREBASE_URL'
     })
 
 if not firebase_admin._apps:
@@ -47,7 +47,7 @@ if not firebase_admin._apps:
 ref = db.reference('sensor')
 
 # ================= GEMINI =================
-genai.configure(api_key="AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc")
+genai.configure(api_key="YOUR_GEMINI_API_KEY")
 gemini = genai.GenerativeModel("gemini-pro")
 
 # ================= PREPROCESS =================
@@ -159,15 +159,12 @@ elif page == "📈 Analytics":
 
         df = df.tail(50)
 
-        # Line chart
         fig1 = px.line(df, y=["soil","temp","hum"], title="Sensor Trends")
         st.plotly_chart(fig1, use_container_width=True)
 
-        # Area chart
         fig2 = px.area(df, y="soil", title="Soil Moisture Trend")
         st.plotly_chart(fig2, use_container_width=True)
 
-        # Histogram
         fig3 = px.histogram(df, x="hum", title="Humidity Distribution")
         st.plotly_chart(fig3, use_container_width=True)
 
