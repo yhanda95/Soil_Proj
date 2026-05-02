@@ -5,23 +5,37 @@ import firebase_admin
 from firebase_admin import credentials, db
 from streamlit_autorefresh import st_autorefresh
 import google.generativeai as genai
+import json
 
 # ================= CONFIG =================
 st.set_page_config(page_title="Smart Agriculture", layout="wide")
 st_autorefresh(interval=5000, key="refresh")
 
-# ================= FIREBASE =================
+# ================= FIREBASE INIT =================
 @st.cache_resource
 def init_firebase():
-    cred = credentials.Certificate("firebase_key.json")
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/'
-    })
+    try:
+        if not firebase_admin._apps:
+            with open("firebase_key.json") as f:
+                cred_dict = json.load(f)
 
-if not firebase_admin._apps:
-    init_firebase()
+            cred = credentials.Certificate(cred_dict)
 
-ref = db.reference("sensor")
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': 'https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/'
+            })
+        return True
+    except Exception as e:
+        st.error("❌ Firebase initialization failed")
+        st.write(e)
+        return False
+
+firebase_ok = init_firebase()
+
+if firebase_ok:
+    ref = db.reference("sensor")
+else:
+    st.stop()
 
 # ================= GEMINI =================
 genai.configure(api_key="AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc")
@@ -43,7 +57,12 @@ if page == "📊 Live Data":
 
     st.subheader("Real-Time Sensor Data")
 
-    data = ref.get()
+    try:
+        data = ref.get()
+    except Exception as e:
+        st.error("❌ Firebase fetch error")
+        st.write(e)
+        st.stop()
 
     if data:
         latest = list(data.values())[-1]
@@ -60,15 +79,15 @@ if page == "📊 Live Data":
 
         st.markdown("### ⚠ Smart Prediction")
 
-        # 🌱 Soil logic
+        # Soil logic
         if soil < 1500:
-            st.error("Soil is DRY → Irrigation needed immediately")
+            st.error("Soil is DRY → Irrigation needed")
         elif soil < 3000:
             st.warning("Soil moisture is MODERATE")
         else:
             st.success("Soil moisture is GOOD")
 
-        # 🦠 Disease risk logic
+        # Disease risk logic
         if hum > 80 and 20 < temp < 30:
             st.error("High risk of fungal disease ⚠")
         elif hum > 70:
@@ -86,22 +105,27 @@ elif page == "📈 Analytics":
 
     st.subheader("Sensor Data Analytics")
 
-    data = ref.get()
+    try:
+        data = ref.get()
+    except Exception as e:
+        st.error("❌ Firebase fetch error")
+        st.write(e)
+        st.stop()
 
     if data:
         df = pd.DataFrame(list(data.values())).tail(50)
 
         st.markdown("### 📊 Trends")
-        st.plotly_chart(px.line(df, y=["soil", "temp", "hum"]),
-                        use_container_width=True)
+        fig = px.line(df, y=["soil", "temp", "hum"])
+        st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("### 📌 Insights")
 
         if df["hum"].mean() > 70:
-            st.warning("High humidity trend → fungal disease risk")
+            st.warning("High humidity trend → fungal risk")
 
         if df["soil"].min() < 1500:
-            st.warning("Low soil moisture detected → irrigation needed")
+            st.warning("Low soil moisture detected")
 
     else:
         st.warning("No data available")
@@ -115,7 +139,10 @@ elif page == "🤖 AI Chatbot":
 
     user_input = st.text_area("Ask your farming question")
 
-    data = ref.get()
+    try:
+        data = ref.get()
+    except:
+        data = None
 
     if data:
         latest = list(data.values())[-1]
@@ -138,8 +165,12 @@ elif page == "🤖 AI Chatbot":
 
             Question: {user_input}
 
-            Give clear, short, practical farming advice.
+            Give short, practical farming advice.
             """
 
-            response = chat_model.generate_content(prompt)
-            st.success(response.text)
+            try:
+                response = chat_model.generate_content(prompt)
+                st.success(response.text)
+            except Exception as e:
+                st.error("❌ Chatbot error")
+                st.write(e)
