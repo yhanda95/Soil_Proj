@@ -9,18 +9,24 @@ import firebase_admin
 from firebase_admin import credentials, db
 from streamlit_autorefresh import st_autorefresh
 import google.generativeai as genai
+import gdown
+import os
 
 # ================= CONFIG =================
 st.set_page_config(page_title="Smart Agriculture", layout="wide")
 st_autorefresh(interval=3000, key="refresh")
 
-# ================= LOAD MODEL (FIXED) =================
+# ================= LOAD MODEL FROM DRIVE =================
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model(
-        "plant_disease_model.h5",
-        compile=False
-    )
+    MODEL_PATH = "final_model.keras"
+
+    if not os.path.exists(MODEL_PATH):
+        st.info("Downloading model from Drive...")
+        url = "https://drive.google.com/file/d/1DGsTskifcu2h1KdvSJjRJRPXKd_wS3E3/view?usp=sharing"
+        gdown.download(url, MODEL_PATH, quiet=False)
+
+    return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 model = load_model()
 
@@ -47,7 +53,7 @@ ref = db.reference("sensor")
 genai.configure(api_key="AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc")
 chat_model = genai.GenerativeModel("gemini-pro")
 
-# ================= PREPROCESS =================
+# ================= IMAGE PREPROCESS =================
 def preprocess(img):
     img = img.resize((224, 224))
     img = np.array(img) / 255.0
@@ -105,7 +111,7 @@ elif page == "📊 Live Data":
         c1, c2, c3 = st.columns(3)
 
         c1.metric("🌱 Soil", soil)
-        c2.metric("🌡 Temp", temp)
+        c2.metric("🌡 Temperature", temp)
         c3.metric("💧 Humidity", hum)
 
         st.markdown("### ⚠ Condition Analysis")
