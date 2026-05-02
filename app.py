@@ -34,8 +34,8 @@ if not firebase_ok:
 ref = db.reference("sensor")
 
 # ================= GEMINI =================
-genai.configure(api_key=st.secrets["AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc"])
-chat_model = genai.GenerativeModel("gemini-pro")
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+chat_model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ================= UI =================
 st.title("🌱 Smart Agriculture System")
@@ -68,7 +68,6 @@ if page == "📊 Live Data":
         hum = latest.get('hum', 0)
 
         c1, c2, c3 = st.columns(3)
-
         c1.metric("🌱 Soil Moisture", soil)
         c2.metric("🌡 Temperature", temp)
         c3.metric("💧 Humidity", hum)
@@ -148,18 +147,19 @@ elif page == "🤖 AI Chatbot":
 
     if user_input:
         with st.spinner("Thinking..."):
+
             prompt = f"""
-            You are an expert agricultural advisor.
+You are an expert agricultural advisor.
 
-            Current conditions:
-            Soil Moisture: {soil}
-            Temperature: {temp}
-            Humidity: {hum}
+Current conditions:
+Soil Moisture: {soil}
+Temperature: {temp}
+Humidity: {hum}
 
-            Question: {user_input}
+Question: {user_input}
 
-            Give short, practical farming advice.
-            """
+Give short, practical farming advice.
+"""
 
             try:
                 response = chat_model.generate_content(prompt)
