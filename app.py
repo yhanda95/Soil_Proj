@@ -17,7 +17,7 @@ st_autorefresh(interval=3000, key="refresh")
 # ================= LOAD MODEL =================
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("model_tf")
+    return tf.keras.models.load_model("model.keras", compile=False)
 
 model = load_model()
 
