@@ -5,40 +5,36 @@ import firebase_admin
 from firebase_admin import credentials, db
 from streamlit_autorefresh import st_autorefresh
 import google.generativeai as genai
-import json
 
 # ================= CONFIG =================
 st.set_page_config(page_title="Smart Agriculture", layout="wide")
 st_autorefresh(interval=5000, key="refresh")
 
-# ================= FIREBASE INIT =================
+# ================= FIREBASE =================
 @st.cache_resource
 def init_firebase():
     try:
         if not firebase_admin._apps:
-            with open("firebase_key.json") as f:
-                cred_dict = json.load(f)
-
-            cred = credentials.Certificate(cred_dict)
+            cred = credentials.Certificate(dict(st.secrets["firebase"]))
 
             firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/'
+                "databaseURL": "https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/"
             })
         return True
     except Exception as e:
-        st.error("❌ Firebase initialization failed")
+        st.error("❌ Firebase init failed")
         st.write(e)
         return False
 
 firebase_ok = init_firebase()
 
-if firebase_ok:
-    ref = db.reference("sensor")
-else:
+if not firebase_ok:
     st.stop()
 
+ref = db.reference("sensor")
+
 # ================= GEMINI =================
-genai.configure(api_key="AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc")
+genai.configure(api_key=st.secrets["AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc"])
 chat_model = genai.GenerativeModel("gemini-pro")
 
 # ================= UI =================
@@ -79,7 +75,6 @@ if page == "📊 Live Data":
 
         st.markdown("### ⚠ Smart Prediction")
 
-        # Soil logic
         if soil < 1500:
             st.error("Soil is DRY → Irrigation needed")
         elif soil < 3000:
@@ -87,9 +82,8 @@ if page == "📊 Live Data":
         else:
             st.success("Soil moisture is GOOD")
 
-        # Disease risk logic
         if hum > 80 and 20 < temp < 30:
-            st.error("High risk of fungal disease ⚠")
+            st.error("High fungal disease risk ⚠")
         elif hum > 70:
             st.warning("Moderate disease risk")
         else:
@@ -154,7 +148,6 @@ elif page == "🤖 AI Chatbot":
 
     if user_input:
         with st.spinner("Thinking..."):
-
             prompt = f"""
             You are an expert agricultural advisor.
 
