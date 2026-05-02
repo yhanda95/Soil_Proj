@@ -14,10 +14,13 @@ import google.generativeai as genai
 st.set_page_config(page_title="Smart Agriculture", layout="wide")
 st_autorefresh(interval=3000, key="refresh")
 
-# ================= LOAD MODEL =================
+# ================= LOAD MODEL (FIXED) =================
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("model.keras", compile=False)
+    return tf.keras.models.load_model(
+        "plant_disease_model.h5",
+        compile=False
+    )
 
 model = load_model()
 
