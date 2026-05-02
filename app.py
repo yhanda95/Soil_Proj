@@ -14,20 +14,35 @@ import os
 
 # ================= CONFIG =================
 st.set_page_config(page_title="Smart Agriculture", layout="wide")
-st_autorefresh(interval=3000, key="refresh")
+st_autorefresh(interval=5000, key="refresh")
 
-# ================= LOAD MODEL (WEIGHTS METHOD) =================
+# ================= MODEL LOADING =================
 @st.cache_resource
 def load_model():
+
     WEIGHTS_PATH = "model.weights.h5"
 
-    # 🔽 Download from Drive if not exists
+    # ✅ Download ONLY if not present
     if not os.path.exists(WEIGHTS_PATH):
+
         st.info("Downloading model weights...")
-        url = "https://drive.google.com/file/d/1DOkjGe0GowFu4NBrmyhC2iZWHraysO7I/view?usp=sharing"
+
+        url = "https://drive.google.com/file/d/1DOkjGe0GowFu4NBrmyhC2iZWHraysO7I/view?usp=share_link"
+
         gdown.download(url, WEIGHTS_PATH, quiet=False)
 
-    # 🔥 Rebuild SAME model architecture
+    # ✅ Check file
+    if not os.path.exists(WEIGHTS_PATH):
+        st.error("❌ Model download failed")
+        st.stop()
+
+    size = os.path.getsize(WEIGHTS_PATH)
+
+    if size < 5_000_000:  # <5MB means broken
+        st.error("❌ Corrupted model file. Fix Google Drive link.")
+        st.stop()
+
+    # 🔥 Rebuild SAME architecture (VERY IMPORTANT)
     model = tf.keras.Sequential([
         tf.keras.layers.Input(shape=(224, 224, 3)),
 
@@ -44,16 +59,23 @@ def load_model():
         tf.keras.layers.Dense(128, activation='relu'),
         tf.keras.layers.Dropout(0.5),
 
-        tf.keras.layers.Dense(4, activation='softmax')  # 🔴 CHANGE if needed
+        tf.keras.layers.Dense(4, activation='softmax')  # 🔴 CHANGE IF NEEDED
     ])
 
-    model.load_weights(WEIGHTS_PATH)
+    # ✅ Load weights safely
+    try:
+        model.load_weights(WEIGHTS_PATH)
+    except Exception as e:
+        st.error("❌ Model loading failed")
+        st.write(e)
+        st.stop()
 
     return model
 
+
 model = load_model()
 
-# ================= LOAD LABELS =================
+# ================= LABELS =================
 with open("class_indices.json") as f:
     class_indices = json.load(f)
 
@@ -76,7 +98,7 @@ ref = db.reference("sensor")
 genai.configure(api_key="AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc")
 chat_model = genai.GenerativeModel("gemini-pro")
 
-# ================= IMAGE PREPROCESS =================
+# ================= PREPROCESS =================
 def preprocess(img):
     img = img.resize((224, 224))
     img = np.array(img) / 255.0
@@ -98,16 +120,13 @@ page = st.sidebar.radio("Navigation", [
 # =====================================================
 if page == "🌿 Disease Detection":
 
-    st.subheader("Upload Leaf Image")
-
-    file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    file = st.file_uploader("Upload leaf image", type=["jpg", "png", "jpeg"])
 
     if file:
         img = Image.open(file).convert("RGB")
-        st.image(img, use_column_width=True)
+        st.image(img)
 
-        processed = preprocess(img)
-        pred = model.predict(processed)
+        pred = model.predict(preprocess(img))
 
         idx = np.argmax(pred)
         confidence = np.max(pred) * 100
@@ -120,8 +139,6 @@ if page == "🌿 Disease Detection":
 # =====================================================
 elif page == "📊 Live Data":
 
-    st.subheader("Real-Time Sensor Data")
-
     data = ref.get()
 
     if data:
@@ -132,58 +149,39 @@ elif page == "📊 Live Data":
         hum = latest.get('hum', 0)
 
         c1, c2, c3 = st.columns(3)
-
         c1.metric("🌱 Soil", soil)
-        c2.metric("🌡 Temperature", temp)
+        c2.metric("🌡 Temp", temp)
         c3.metric("💧 Humidity", hum)
 
-        st.markdown("### ⚠ Condition Analysis")
-
         if soil < 1500:
-            st.error("Soil is DRY → Irrigation needed")
+            st.error("Soil too dry")
         elif soil < 3000:
-            st.warning("Soil moisture is MODERATE")
+            st.warning("Moderate moisture")
         else:
-            st.success("Soil moisture is GOOD")
+            st.success("Good moisture")
 
         if hum > 80 and 20 < temp < 30:
-            st.error("High risk of fungal disease")
-        else:
-            st.success("No immediate disease risk")
-
-    else:
-        st.warning("No data found")
+            st.error("⚠ High fungal risk")
 
 # =====================================================
 # 📈 ANALYTICS
 # =====================================================
 elif page == "📈 Analytics":
 
-    st.subheader("Sensor Data Analytics")
-
     data = ref.get()
 
     if data:
         df = pd.DataFrame(list(data.values())).tail(50)
 
-        fig = px.line(df, y=["soil", "temp", "hum"])
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(px.line(df, y=["soil", "temp", "hum"]))
 
         if df["hum"].mean() > 70:
-            st.warning("High humidity trend → fungal risk")
-
-        if df["soil"].min() < 1500:
-            st.warning("Low soil moisture detected")
-
-    else:
-        st.warning("No data available")
+            st.warning("High humidity trend")
 
 # =====================================================
 # 🤖 CHATBOT
 # =====================================================
 elif page == "🤖 AI Chatbot":
-
-    st.subheader("AI Farming Assistant")
 
     user_input = st.text_area("Ask your question")
 
@@ -206,8 +204,6 @@ elif page == "🤖 AI Chatbot":
         Humidity: {hum}
 
         Question: {user_input}
-
-        Give short practical advice.
         """
 
         response = chat_model.generate_content(prompt)
