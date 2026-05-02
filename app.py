@@ -7,8 +7,8 @@ import pandas as pd
 import plotly.express as px
 import firebase_admin
 from firebase_admin import credentials, db
-import google.generativeai as genai
 from streamlit_autorefresh import st_autorefresh
+import google.generativeai as genai
 
 # ================= CONFIG =================
 st.set_page_config(page_title="Smart Agriculture", layout="wide")
@@ -17,18 +17,15 @@ st_autorefresh(interval=3000, key="refresh")
 # ================= LOAD MODEL =================
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("plant_disease_model.h5")
+    return tf.keras.models.load_model("model_tf")
 
 model = load_model()
 
-# ================= LOAD FILES =================
-with open("class_indices.json", "r") as f:
+# ================= LOAD LABELS =================
+with open("class_indices.json") as f:
     class_indices = json.load(f)
 
-with open("disease_info.json", "r") as f:
-    disease_info = json.load(f)
-
-class_names = list(class_indices.keys())
+idx_to_class = {v: k for k, v in class_indices.items()}
 
 # ================= FIREBASE =================
 @st.cache_resource
@@ -61,7 +58,7 @@ page = st.sidebar.radio("Navigation", [
     "🌿 Disease Detection",
     "📊 Live Data",
     "📈 Analytics",
-    "🤖 Chatbot"
+    "🤖 AI Chatbot"
 ])
 
 # =====================================================
@@ -71,27 +68,20 @@ if page == "🌿 Disease Detection":
 
     st.subheader("Upload Leaf Image")
 
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 
-    if uploaded_file:
-        img = Image.open(uploaded_file).convert("RGB")
+    if file:
+        img = Image.open(file).convert("RGB")
         st.image(img, use_column_width=True)
 
         processed = preprocess(img)
         pred = model.predict(processed)
 
-        predicted_class = class_names[np.argmax(pred)]
+        idx = np.argmax(pred)
         confidence = np.max(pred) * 100
 
-        st.success(f"{predicted_class}")
+        st.success(f"Prediction: {idx_to_class[idx]}")
         st.info(f"Confidence: {confidence:.2f}%")
-
-        if predicted_class in disease_info:
-            st.subheader("Cause")
-            st.write(disease_info[predicted_class]["cause"])
-
-            st.subheader("Prevention")
-            st.write(disease_info[predicted_class]["prevention"])
 
 # =====================================================
 # 📊 LIVE DATA
@@ -105,34 +95,39 @@ elif page == "📊 Live Data":
     if data:
         latest = list(data.values())[-1]
 
-        soil = latest['soil']
-        temp = latest['temp']
-        hum = latest['hum']
+        soil = latest.get('soil', 0)
+        temp = latest.get('temp', 0)
+        hum = latest.get('hum', 0)
 
         c1, c2, c3 = st.columns(3)
+
         c1.metric("🌱 Soil", soil)
         c2.metric("🌡 Temp", temp)
         c3.metric("💧 Humidity", hum)
 
-        # Smart alerts
         st.markdown("### ⚠ Condition Analysis")
 
         if soil < 1500:
-            st.error("Soil is too dry → Irrigation needed")
+            st.error("Soil is DRY → Irrigation needed")
         elif soil < 3000:
-            st.warning("Soil moisture moderate")
+            st.warning("Soil moisture is MODERATE")
         else:
-            st.success("Soil moisture good")
+            st.success("Soil moisture is GOOD")
 
         if hum > 80 and 20 < temp < 30:
             st.error("High risk of fungal disease")
+        else:
+            st.success("No immediate disease risk")
+
+    else:
+        st.warning("No data found in Firebase")
 
 # =====================================================
 # 📈 ANALYTICS
 # =====================================================
 elif page == "📈 Analytics":
 
-    st.subheader("Sensor Trends")
+    st.subheader("Sensor Data Analytics")
 
     data = ref.get()
 
@@ -140,42 +135,62 @@ elif page == "📈 Analytics":
         df = pd.DataFrame(list(data.values()))
         df = df.tail(50)
 
-        fig1 = px.line(df, y=["soil", "temp", "hum"], title="Sensor Trends")
+        st.markdown("### 📊 Trends")
+        fig1 = px.line(df, y=["soil", "temp", "hum"])
         st.plotly_chart(fig1, use_container_width=True)
 
-        fig2 = px.area(df, y="soil", title="Soil Moisture")
+        st.markdown("### 🌱 Soil Moisture")
+        fig2 = px.area(df, y="soil")
         st.plotly_chart(fig2, use_container_width=True)
 
-        fig3 = px.histogram(df, x="hum", title="Humidity Distribution")
+        st.markdown("### 💧 Humidity Distribution")
+        fig3 = px.histogram(df, x="hum")
         st.plotly_chart(fig3, use_container_width=True)
 
+        st.markdown("### 📌 Insights")
+
+        if df["hum"].mean() > 70:
+            st.warning("High humidity trend → fungal diseases possible")
+
+        if df["soil"].min() < 1500:
+            st.warning("Low soil moisture detected → irrigation needed")
+
+    else:
+        st.warning("No data available")
+
 # =====================================================
-# 🤖 CHATBOT
+# 🤖 AI CHATBOT
 # =====================================================
-elif page == "🤖 Chatbot":
+elif page == "🤖 AI Chatbot":
 
     st.subheader("AI Farming Assistant")
 
-    user_input = st.text_area("Ask your question")
+    user_input = st.text_area("Ask your farming question")
 
     data = ref.get()
 
     if data:
         latest = list(data.values())[-1]
-        soil = latest['soil']
-        temp = latest['temp']
-        hum = latest['hum']
+        soil = latest.get('soil', "unknown")
+        temp = latest.get('temp', "unknown")
+        hum = latest.get('hum', "unknown")
+    else:
+        soil, temp, hum = "unknown", "unknown", "unknown"
 
     if user_input:
         with st.spinner("Thinking..."):
+
             prompt = f"""
-            Soil: {soil}
+            You are an expert agricultural advisor.
+
+            Current conditions:
+            Soil Moisture: {soil}
             Temperature: {temp}
             Humidity: {hum}
 
             Question: {user_input}
 
-            Give practical farming advice.
+            Give clear, short, practical farming advice.
             """
 
             response = chat_model.generate_content(prompt)
