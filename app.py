@@ -16,17 +16,40 @@ import os
 st.set_page_config(page_title="Smart Agriculture", layout="wide")
 st_autorefresh(interval=3000, key="refresh")
 
-# ================= LOAD MODEL FROM DRIVE =================
+# ================= LOAD MODEL (WEIGHTS METHOD) =================
 @st.cache_resource
 def load_model():
-    MODEL_PATH = "fixed_model.keras"
+    WEIGHTS_PATH = "model.weights.h5"
 
-    if not os.path.exists(MODEL_PATH):
-        st.info("Downloading model from Drive...")
-        url = "https://drive.google.com/file/d/12g7A6PxgKoBDja8C3NvXPvu1N2gmRSLE/view?usp=sharing"
-        gdown.download(url, MODEL_PATH, quiet=False)
+    # 🔽 Download from Drive if not exists
+    if not os.path.exists(WEIGHTS_PATH):
+        st.info("Downloading model weights...")
+        url = "https://drive.google.com/file/d/1DOkjGe0GowFu4NBrmyhC2iZWHraysO7I/view?usp=sharing"
+        gdown.download(url, WEIGHTS_PATH, quiet=False)
 
-    return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    # 🔥 Rebuild SAME model architecture
+    model = tf.keras.Sequential([
+        tf.keras.layers.Input(shape=(224, 224, 3)),
+
+        tf.keras.layers.Conv2D(32, (3,3), activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+
+        tf.keras.layers.Conv2D(64, (3,3), activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+
+        tf.keras.layers.Conv2D(128, (3,3), activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dropout(0.5),
+
+        tf.keras.layers.Dense(4, activation='softmax')  # 🔴 CHANGE if needed
+    ])
+
+    model.load_weights(WEIGHTS_PATH)
+
+    return model
 
 model = load_model()
 
@@ -129,7 +152,7 @@ elif page == "📊 Live Data":
             st.success("No immediate disease risk")
 
     else:
-        st.warning("No data found in Firebase")
+        st.warning("No data found")
 
 # =====================================================
 # 📈 ANALYTICS
@@ -141,40 +164,28 @@ elif page == "📈 Analytics":
     data = ref.get()
 
     if data:
-        df = pd.DataFrame(list(data.values()))
-        df = df.tail(50)
+        df = pd.DataFrame(list(data.values())).tail(50)
 
-        st.markdown("### 📊 Trends")
-        fig1 = px.line(df, y=["soil", "temp", "hum"])
-        st.plotly_chart(fig1, use_container_width=True)
-
-        st.markdown("### 🌱 Soil Moisture")
-        fig2 = px.area(df, y="soil")
-        st.plotly_chart(fig2, use_container_width=True)
-
-        st.markdown("### 💧 Humidity Distribution")
-        fig3 = px.histogram(df, x="hum")
-        st.plotly_chart(fig3, use_container_width=True)
-
-        st.markdown("### 📌 Insights")
+        fig = px.line(df, y=["soil", "temp", "hum"])
+        st.plotly_chart(fig, use_container_width=True)
 
         if df["hum"].mean() > 70:
-            st.warning("High humidity trend → fungal diseases possible")
+            st.warning("High humidity trend → fungal risk")
 
         if df["soil"].min() < 1500:
-            st.warning("Low soil moisture detected → irrigation needed")
+            st.warning("Low soil moisture detected")
 
     else:
         st.warning("No data available")
 
 # =====================================================
-# 🤖 AI CHATBOT
+# 🤖 CHATBOT
 # =====================================================
 elif page == "🤖 AI Chatbot":
 
     st.subheader("AI Farming Assistant")
 
-    user_input = st.text_area("Ask your farming question")
+    user_input = st.text_area("Ask your question")
 
     data = ref.get()
 
@@ -187,20 +198,17 @@ elif page == "🤖 AI Chatbot":
         soil, temp, hum = "unknown", "unknown", "unknown"
 
     if user_input:
-        with st.spinner("Thinking..."):
+        prompt = f"""
+        You are an agriculture expert.
 
-            prompt = f"""
-            You are an expert agricultural advisor.
+        Soil: {soil}
+        Temp: {temp}
+        Humidity: {hum}
 
-            Current conditions:
-            Soil Moisture: {soil}
-            Temperature: {temp}
-            Humidity: {hum}
+        Question: {user_input}
 
-            Question: {user_input}
+        Give short practical advice.
+        """
 
-            Give clear, short, practical farming advice.
-            """
-
-            response = chat_model.generate_content(prompt)
-            st.success(response.text)
+        response = chat_model.generate_content(prompt)
+        st.success(response.text)
