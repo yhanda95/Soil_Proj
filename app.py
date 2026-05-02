@@ -19,11 +19,11 @@ st_autorefresh(interval=3000, key="refresh")
 # ================= LOAD MODEL FROM DRIVE =================
 @st.cache_resource
 def load_model():
-    MODEL_PATH = "final_model.keras"
+    MODEL_PATH = "fixed_model.keras"
 
     if not os.path.exists(MODEL_PATH):
         st.info("Downloading model from Drive...")
-        url = "https://drive.google.com/file/d/1DGsTskifcu2h1KdvSJjRJRPXKd_wS3E3/view?usp=sharing"
+        url = "https://drive.google.com/file/d/12g7A6PxgKoBDja8C3NvXPvu1N2gmRSLE/view?usp=sharing"
         gdown.download(url, MODEL_PATH, quiet=False)
 
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
