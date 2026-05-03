@@ -119,35 +119,51 @@ elif page == "🤖 AI Chatbot":
 
         st.chat_message("assistant").write(reply)
         st.session_state.chat.append({"role": "assistant", "content": reply})
-
 # =====================================================
-# 📊 DATA ANALYSIS PAGE
+# 📊 DATA ANALYSIS PAGE (UPGRADED)
 # =====================================================
 elif page == "📊 Data Analysis":
 
-    st.title("📊 Sensor Data Analytics Dashboard")
+    st.title("📊 Smart IoT Sensor Analytics Dashboard")
 
     uploaded_file = st.file_uploader("Upload Firebase JSON", type=["json"])
 
     if uploaded_file:
 
-        raw_data = json.load(uploaded_file)
+        import json
+        import pandas as pd
+        import matplotlib.pyplot as plt
 
-        records = [v for v in raw_data.values()]
+        raw = json.load(uploaded_file)
+
+        # =====================================================
+        # 🔥 FIX: YOUR DATA IS INSIDE "sensor_logs"
+        # =====================================================
+        if "sensor_logs" in raw:
+            raw_data = raw["sensor_logs"]
+        else:
+            raw_data = raw
+
+        # =====================================================
+        # CONVERT TO DATAFRAME
+        # =====================================================
+        records = list(raw_data.values())
         df = pd.DataFrame(records)
 
-        # TIME HANDLING
+        # =====================================================
+        # SORT BY TIME
+        # =====================================================
         if "time" in df.columns:
             df["time"] = pd.to_datetime(df["time"])
             df = df.sort_values("time")
 
-        st.subheader("📋 Data Table")
+        st.subheader("📋 Sensor Data Table")
         st.dataframe(df)
 
         # =====================================================
-        # INSIGHT CARDS
+        # 📌 KPI CARDS (INSIGHTS)
         # =====================================================
-        st.subheader("📌 Insights")
+        st.subheader("📌 Key Insights")
 
         col1, col2, col3 = st.columns(3)
 
@@ -163,10 +179,17 @@ elif page == "📊 Data Analysis":
             col5.metric("💧 Min Hum", f"{df['hum'].min():.2f}")
             col6.metric("💧 Avg Hum", f"{df['hum'].mean():.2f}")
 
+        col7, col8, col9 = st.columns(3)
+
+        if "soil" in df.columns:
+            col7.metric("🌱 Max Soil", f"{df['soil'].max():.2f}")
+            col8.metric("🌱 Min Soil", f"{df['soil'].min():.2f}")
+            col9.metric("🌱 Avg Soil", f"{df['soil'].mean():.2f}")
+
         # =====================================================
-        # TIME SERIES
+        # 📈 TIME SERIES (SELECTABLE)
         # =====================================================
-        st.subheader("📈 Time Series Graph")
+        st.subheader("📈 Time Series Analysis")
 
         cols = [c for c in df.columns if c != "time"]
         selected = st.selectbox("Select parameter", cols)
@@ -174,25 +197,30 @@ elif page == "📊 Data Analysis":
         fig, ax = plt.subplots()
         ax.plot(df["time"], df[selected], marker="o")
         ax.set_title(f"{selected} Over Time")
+        ax.set_xlabel("Time")
+        ax.set_ylabel(selected)
         plt.xticks(rotation=45)
+
         st.pyplot(fig)
 
         # =====================================================
-        # MULTI-LINE GRAPH
+        # 📊 MULTI-LINE GRAPH
         # =====================================================
-        st.subheader("📊 Multi Parameter Trend")
+        st.subheader("📊 Multi-Parameter Trend")
 
         fig2, ax2 = plt.subplots()
 
         if "temp" in df.columns:
-            ax2.plot(df["time"], df["temp"], label="Temp")
+            ax2.plot(df["time"], df["temp"], label="Temperature 🌡")
 
         if "hum" in df.columns:
-            ax2.plot(df["time"], df["hum"], label="Humidity")
+            ax2.plot(df["time"], df["hum"], label="Humidity 💧")
 
         if "soil" in df.columns:
-            ax2.plot(df["time"], df["soil"], label="Soil")
+            ax2.plot(df["time"], df["soil"], label="Soil 🌱")
 
+        ax2.set_title("Sensor Trends Over Time")
         ax2.legend()
+
         plt.xticks(rotation=45)
         st.pyplot(fig2)
