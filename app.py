@@ -7,26 +7,14 @@ import json
 import firebase_admin
 from firebase_admin import credentials, db
 
-from transformers import pipeline
-
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Smart Agriculture System 🌿", layout="wide")
 
 # ---------------- FIREBASE INIT ----------------
 if not firebase_admin._apps:
 
-    firebase_config = {
-        "type": st.secrets["firebase"]["type"],
-        "project_id": st.secrets["firebase"]["project_id"],
-        "private_key_id": st.secrets["firebase"]["private_key_id"],
-        "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),
-        "client_email": st.secrets["firebase"]["client_email"],
-        "client_id": st.secrets["firebase"]["client_id"],
-        "auth_uri": st.secrets["firebase"]["auth_uri"],
-        "token_uri": st.secrets["firebase"]["token_uri"],
-        "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"]
-    }
+    firebase_config = dict(st.secrets["firebase"])
+    firebase_config["private_key"] = firebase_config["private_key"].replace("\\n", "\n")
 
     cred = credentials.Certificate(firebase_config)
 
@@ -34,22 +22,15 @@ if not firebase_admin._apps:
         "databaseURL": "https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/"
     })
 
+# ---------------- GET SENSOR DATA ----------------
 def get_sensor_data():
-    ref = db.reference("sensor")
-    return ref.get()
+    try:
+        ref = db.reference("sensor")
+        return ref.get()
+    except:
+        return None
 
-# ---------------- CHATBOT ----------------
-@st.cache_resource
-def load_chatbot():
-    return pipeline("text-generation", model="distilgpt2")
-
-chatbot = load_chatbot()
-
-def ask_ai(question):
-    response = chatbot(question, max_length=120, num_return_sequences=1)
-    return response[0]["generated_text"]
-
-# ---------------- CNN MODEL ----------------
+# ---------------- LOAD MODEL ----------------
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model("plant_disease_model.keras")
@@ -74,27 +55,26 @@ def preprocess(img):
     return np.expand_dims(img, axis=0)
 
 # ---------------- SIDEBAR ----------------
-choice = st.sidebar.radio("Select Module", [
+page = st.sidebar.selectbox("Select Module", [
     "🌿 Disease Detection",
-    "📡 Live Sensor Data",
-    "🤖 AI Chatbot"
+    "📡 Live Sensor Data"
 ])
 
 # =====================================================
-# 🌿 DISEASE DETECTION
+# 🌿 DISEASE DETECTION PAGE
 # =====================================================
-if choice == "🌿 Disease Detection":
+if page == "🌿 Disease Detection":
 
     st.title("🌿 Plant Disease Detection System")
 
-    file = st.file_uploader("Upload Leaf Image", type=["jpg", "png", "jpeg"])
+    uploaded_file = st.file_uploader("Upload Leaf Image", type=["jpg", "png", "jpeg"])
 
-    if file:
+    if uploaded_file:
 
-        img = Image.open(file).convert("RGB")
-        st.image(img, caption="Uploaded Image")
+        image = Image.open(uploaded_file).convert("RGB")
+        st.image(image, caption="Uploaded Image")
 
-        prediction = model.predict(preprocess(img))
+        prediction = model.predict(preprocess(image))
 
         label = class_names[np.argmax(prediction)]
         confidence = float(np.max(prediction))
@@ -110,9 +90,9 @@ if choice == "🌿 Disease Detection":
             st.write(disease_info[label]["prevention"])
 
 # =====================================================
-# 📡 SENSOR DATA (FIREBASE)
+# 📡 SENSOR DATA PAGE
 # =====================================================
-elif choice == "📡 Live Sensor Data":
+elif page == "📡 Live Sensor Data":
 
     st.title("📡 Live Farm Monitoring System")
 
@@ -123,31 +103,4 @@ elif choice == "📡 Live Sensor Data":
         st.metric("💧 Humidity", f"{data.get('humidity', 0)} %")
         st.metric("🌱 Soil Moisture", f"{data.get('soil_moisture', 0)} %")
     else:
-        st.warning("No data found in Firebase database")
-
-# =====================================================
-# 🤖 CHATBOT
-# =====================================================
-elif choice == "🤖 AI Chatbot":
-
-    st.title("🤖 Farming AI Assistant")
-
-    if "chat" not in st.session_state:
-        st.session_state.chat = []
-
-    for msg in st.session_state.chat:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-
-    user_input = st.chat_input("Ask anything about farming...")
-
-    if user_input:
-
-        st.chat_message("user").write(user_input)
-        st.session_state.chat.append({"role": "user", "content": user_input})
-
-        with st.spinner("Thinking..."):
-            reply = ask_ai(user_input)
-
-        st.chat_message("assistant").write(reply)
-        st.session_state.chat.append({"role": "assistant", "content": reply})
+        st.warning("No sensor data found in Firebase")
