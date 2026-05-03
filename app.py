@@ -76,7 +76,7 @@ if page == "🌿 Disease Detection":
     if uploaded_file:
 
         image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, use_container_width=True)
+        st.image(image, use_column_width=True)
 
         prediction = model.predict(preprocess(image))
 
