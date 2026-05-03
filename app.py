@@ -6,14 +6,13 @@ import json
 
 from transformers import pipeline
 
-# ---------------- FIREBASE ----------------
 import firebase_admin
 from firebase_admin import credentials, db
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="Plant Disease Detection 🌿", layout="centered")
 
-# ---------------- INIT FIREBASE (SAFE) ----------------
+# ---------------- FIREBASE INIT ----------------
 if not firebase_admin._apps:
 
     firebase_config = dict(st.secrets["firebase"])
@@ -25,26 +24,34 @@ if not firebase_admin._apps:
         "databaseURL": "https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/"
     })
 
-# ---------------- GET SENSOR DATA ----------------
+# ---------------- GET LATEST SENSOR DATA ----------------
 def get_sensor_data():
     try:
         ref = db.reference("sensor")
-        return ref.get()
-    except:
+        data = ref.get()
+
+        if not data:
+            return None
+
+        # Firebase has timestamp-like keys → get latest entry
+        latest_key = sorted(data.keys())[-1]
+        return data[latest_key]
+
+    except Exception as e:
+        st.error(f"Firebase Error: {e}")
         return None
 
-# ---------------- LOAD MODEL ----------------
+# ---------------- MODEL ----------------
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model("plant_disease_model.keras")
 
 model = load_model()
 
-# ---------------- LOAD DISEASE INFO ----------------
+# ---------------- DISEASE INFO ----------------
 with open("disease_info.json", "r") as f:
     disease_info = json.load(f)
 
-# ---------------- CLASS NAMES ----------------
 class_names = [
     "Tomato_Bacterial_spot",
     "Tomato_Early_blight",
@@ -67,11 +74,7 @@ def load_chatbot():
 chatbot = load_chatbot()
 
 def get_response(user_input):
-    result = chatbot(
-        user_input,
-        max_length=100,
-        num_return_sequences=1
-    )
+    result = chatbot(user_input, max_length=100, num_return_sequences=1)
     return result[0]["generated_text"]
 
 # ---------------- SIDEBAR ----------------
@@ -94,21 +97,20 @@ if page == "🌿 Disease Detection":
         image = Image.open(uploaded_file).convert("RGB")
         st.image(image, caption="Uploaded Image")
 
-        processed = preprocess(image)
-        prediction = model.predict(processed)
+        prediction = model.predict(preprocess(image))
 
-        predicted_class = class_names[np.argmax(prediction)]
+        label = class_names[np.argmax(prediction)]
         confidence = float(np.max(prediction))
 
-        st.subheader(f"🧠 Prediction: {predicted_class}")
+        st.subheader(f"Prediction: {label}")
         st.write(f"Confidence: {confidence*100:.2f}%")
 
-        if predicted_class in disease_info:
+        if label in disease_info:
             st.subheader("🦠 Cause")
-            st.write(disease_info[predicted_class]["cause"])
+            st.write(disease_info[label]["cause"])
 
             st.subheader("🛡 Prevention")
-            st.write(disease_info[predicted_class]["prevention"])
+            st.write(disease_info[label]["prevention"])
 
 # =====================================================
 # 🤖 CHATBOT
@@ -138,7 +140,7 @@ elif page == "🤖 AI Chatbot":
         st.session_state.chat.append({"role": "assistant", "content": reply})
 
 # =====================================================
-# 📡 SENSOR DATA (FIREBASE)
+# 📡 SENSOR DATA
 # =====================================================
 elif page == "📡 Live Sensor Data":
 
@@ -147,8 +149,8 @@ elif page == "📡 Live Sensor Data":
     data = get_sensor_data()
 
     if data:
-        st.metric("🌡 Temperature", f"{data.get('temperature', 0)} °C")
-        st.metric("💧 Humidity", f"{data.get('humidity', 0)} %")
-        st.metric("🌱 Soil Moisture", f"{data.get('soil_moisture', 0)} %")
+        st.metric("🌡 Temperature", f"{data.get('temp', 0)} °C")
+        st.metric("💧 Humidity", f"{data.get('hum', 0)} %")
+        st.metric("🌱 Soil Moisture", f"{data.get('soil', 0)}")
     else:
         st.warning("No sensor data found in Firebase")
