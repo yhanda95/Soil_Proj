@@ -6,28 +6,13 @@ import json
 import google.generativeai as genai
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="Plant Disease AI 🌿", layout="centered")
+st.set_page_config(page_title="Smart Agriculture AI 🌿🤖", layout="centered")
 
-# ---------------- GEMINI SETUP ----------------
-genai.configure(api_key="AIzaSyC0LQ0I3H6nDWDVIJ8ZymMUUMvt-UGDLZY")  # replace this
+# ---------------- GEMINI ----------------
+genai.configure(api_key="YOUR_GEMINI_API_KEY")
 
-def query_gemini(question, disease):
+def get_gemini_response(prompt):
     model = genai.GenerativeModel("models/gemini-1.5-flash")
-
-    prompt = f"""
-You are an expert agriculture assistant.
-
-Detected plant disease: {disease}
-
-User question: {question}
-
-Give simple, practical farming advice:
-- treatment
-- prevention
-- steps for farmers
-Keep answer under 8 lines.
-"""
-
     response = model.generate_content(prompt)
     return response.text
 
@@ -57,42 +42,81 @@ def preprocess(image):
     image = np.expand_dims(image, axis=0)
     return image
 
-# ---------------- UI ----------------
-st.title("🌿 Plant Disease Detection System")
-st.write("Upload a leaf image and get disease prediction + AI farming advice")
+# ---------------- SIDEBAR NAV ----------------
+page = st.sidebar.selectbox("Select Page", ["🌿 Disease Detection", "🤖 AI Chatbot"])
 
-uploaded_file = st.file_uploader("Upload Leaf Image", type=["jpg", "jpeg", "png"])
+# =========================================================
+# 🌿 PAGE 1 - DISEASE DETECTION
+# =========================================================
+if page == "🌿 Disease Detection":
 
-# ---------------- PREDICTION ----------------
-if uploaded_file:
+    st.title("🌿 Plant Disease Detection System")
 
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Image")
+    uploaded_file = st.file_uploader("Upload Leaf Image", type=["jpg", "jpeg", "png"])
 
-    processed = preprocess(image)
-    prediction = model.predict(processed)
+    if uploaded_file:
 
-    predicted_class = class_names[np.argmax(prediction)]
-    confidence = float(np.max(prediction))
+        image = Image.open(uploaded_file).convert("RGB")
+        st.image(image, caption="Uploaded Image")
 
-    st.subheader(f"🧠 Prediction: {predicted_class}")
-    st.write(f"Confidence: {confidence*100:.2f}%")
+        processed = preprocess(image)
+        prediction = model.predict(processed)
 
-    # ---------------- DISEASE INFO ----------------
-    if predicted_class in disease_info:
-        st.subheader("🦠 Cause")
-        st.write(disease_info[predicted_class]["cause"])
+        predicted_class = class_names[np.argmax(prediction)]
+        confidence = float(np.max(prediction))
 
-        st.subheader("🛡 Prevention")
-        st.write(disease_info[predicted_class]["prevention"])
+        st.subheader(f"🧠 Prediction: {predicted_class}")
+        st.write(f"Confidence: {confidence*100:.2f}%")
 
-    # ---------------- GEMINI CHATBOT ----------------
-    st.divider()
-    st.subheader("🤖 Ask AI Farming Assistant")
+        # Disease info
+        if predicted_class in disease_info:
+            st.subheader("🦠 Cause")
+            st.write(disease_info[predicted_class]["cause"])
 
-    user_question = st.text_input("Ask about treatment, fertilizer, prevention, etc.")
+            st.subheader("🛡 Prevention")
+            st.write(disease_info[predicted_class]["prevention"])
 
-    if user_question:
-        with st.spinner("AI is thinking..."):
-            answer = query_gemini(user_question, predicted_class)
-            st.success(answer)
+        # Quick AI help
+        st.divider()
+        st.subheader("🤖 Ask AI About This Disease")
+
+        question = st.text_input("Ask something (treatment, fertilizer, etc.)")
+
+        if question:
+            with st.spinner("Thinking..."):
+                prompt = f"""
+                Disease: {predicted_class}
+                Question: {question}
+                Give simple farming advice in 6-8 lines.
+                """
+                answer = get_gemini_response(prompt)
+                st.success(answer)
+
+# =========================================================
+# 🤖 PAGE 2 - CHATBOT
+# =========================================================
+elif page == "🤖 AI Chatbot":
+
+    st.title("🤖 Gemini AI Chatbot")
+    st.write("Ask anything — farming, tech, science, general knowledge")
+
+    if "chat" not in st.session_state:
+        st.session_state.chat = []
+
+    # show history
+    for msg in st.session_state.chat:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+
+    user_input = st.chat_input("Type your message...")
+
+    if user_input:
+
+        st.chat_message("user").write(user_input)
+        st.session_state.chat.append({"role": "user", "content": user_input})
+
+        with st.spinner("Thinking..."):
+            reply = get_gemini_response(user_input)
+
+        st.chat_message("assistant").write(reply)
+        st.session_state.chat.append({"role": "assistant", "content": reply})
