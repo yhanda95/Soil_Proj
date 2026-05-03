@@ -4,47 +4,15 @@ import numpy as np
 from PIL import Image
 import json
 
-import firebase_admin
-from firebase_admin import credentials, db
-
 from transformers import pipeline
 
 # =====================================================
-# 🔥 CONFIG
+# CONFIG
 # =====================================================
 st.set_page_config(
-    page_title="Smart Agriculture System 🌿",
+    page_title="Smart Plant System 🌿",
     layout="centered"
 )
-
-# =====================================================
-# 🔥 FIREBASE INIT
-# =====================================================
-if not firebase_admin._apps:
-
-    cred = credentials.Certificate(dict(st.secrets["firebase"]))
-
-    firebase_admin.initialize_app(cred, {
-        "databaseURL": "https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app"
-    })
-
-# =====================================================
-# 📡 FIREBASE SENSOR DATA
-# =====================================================
-def get_sensor_data():
-    try:
-        ref = db.reference("sensor")
-        data = ref.get()
-
-        if not data:
-            return None
-
-        latest_key = max(data.keys(), key=lambda x: int(x))
-        return data[latest_key]
-
-    except Exception as e:
-        st.error(f"Firebase Error: {e}")
-        return None
 
 # =====================================================
 # 🌿 LOAD MODEL
@@ -69,7 +37,7 @@ class_names = [
 ]
 
 # =====================================================
-# 🧠 PREPROCESS IMAGE
+# 🧠 IMAGE PREPROCESS
 # =====================================================
 def preprocess(image):
     image = image.resize((224, 224))
@@ -78,7 +46,7 @@ def preprocess(image):
     return image
 
 # =====================================================
-# 🤖 CHATBOT
+# 🤖 CHATBOT (LIGHTWEIGHT AI)
 # =====================================================
 @st.cache_resource
 def load_chatbot():
@@ -89,17 +57,17 @@ chatbot = load_chatbot()
 def get_response(user_input):
     result = chatbot(
         user_input,
-        max_length=100,
+        max_length=120,
         num_return_sequences=1
     )
     return result[0]["generated_text"]
 
 # =====================================================
-# 📌 SIDEBAR NAVIGATION
+# SIDEBAR NAVIGATION
 # =====================================================
 page = st.sidebar.selectbox(
     "Choose Module",
-    ["🌿 Disease Detection", "📡 Sensor Data", "🤖 AI Chatbot"]
+    ["🌿 Disease Detection", "🤖 AI Chatbot"]
 )
 
 # =====================================================
@@ -108,8 +76,9 @@ page = st.sidebar.selectbox(
 if page == "🌿 Disease Detection":
 
     st.title("🌿 Plant Disease Detection System")
+    st.write("Upload a leaf image to detect disease.")
 
-    uploaded_file = st.file_uploader("Upload Leaf Image", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
     if uploaded_file:
 
@@ -132,32 +101,12 @@ if page == "🌿 Disease Detection":
             st.write(disease_info[predicted_class]["prevention"])
 
 # =====================================================
-# 📡 SENSOR DATA
-# =====================================================
-elif page == "📡 Sensor Data":
-
-    st.title("📡 Live Sensor Data")
-
-    data = get_sensor_data()
-
-    if data:
-
-        col1, col2, col3 = st.columns(3)
-
-        col1.metric("🌡 Temperature", f"{data.get('temp', 0)} °C")
-        col2.metric("💧 Humidity", f"{data.get('hum', 0)} %")
-        col3.metric("🌱 Soil Moisture", f"{data.get('soil', 0)}")
-
-    else:
-        st.warning("No sensor data found in Firebase")
-
-# =====================================================
 # 🤖 CHATBOT PAGE
 # =====================================================
 elif page == "🤖 AI Chatbot":
 
     st.title("🤖 Farming AI Chatbot")
-    st.write("Ask anything about farming, plants, or diseases.")
+    st.write("Ask anything about plants, farming, or diseases.")
 
     if "chat" not in st.session_state:
         st.session_state.chat = []
