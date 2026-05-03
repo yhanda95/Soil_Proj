@@ -12,7 +12,7 @@ st.set_page_config(page_title="Plant Disease AI 🌿", layout="centered")
 
 # ---------------- LOAD ENV ----------------
 load_dotenv()
-genai.configure(api_key=os.getenv("AIzaSyDJvyVrdsD_DxzCyzFbf6rm-h5br7ksMlc"))
+genai.configure(api_key=os.getenv("AIzaSyBN4g03--SHgVne8N3cnuhxKF5r25qpYac"))
 
 # ---------------- LOAD MODEL ----------------
 @st.cache_resource
