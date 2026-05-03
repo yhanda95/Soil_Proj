@@ -4,23 +4,48 @@ import numpy as np
 from PIL import Image
 import json
 
+import firebase_admin
+from firebase_admin import credentials, db
+
 from transformers import pipeline
 
 # ---------------- CONFIG ----------------
-st.set_page_config(page_title="Plant Disease Detection 🌿", layout="centered")
+st.set_page_config(page_title="Smart Agriculture AI 🌿🤖📡", layout="centered")
 
-# ---------------- LOAD MODEL ----------------
+# ---------------- FIREBASE INIT ----------------
+if not firebase_admin._apps:
+    cred = credentials.Certificate("firebase_key.json")  # 🔥 your firebase key file
+
+    firebase_admin.initialize_app(cred, {
+        "databaseURL": "https://YOUR_PROJECT.firebaseio.com/"  # 🔥 replace this
+    })
+
+def get_sensor_data():
+    ref = db.reference("sensor")
+    return ref.get()
+
+# ---------------- CHATBOT ----------------
+@st.cache_resource
+def load_chatbot():
+    return pipeline("text-generation", model="distilgpt2")
+
+chatbot = load_chatbot()
+
+def get_response(text):
+    result = chatbot(text, max_length=120, num_return_sequences=1)
+    return result[0]["generated_text"]
+
+# ---------------- MODEL ----------------
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model("plant_disease_model.keras")
 
 model = load_model()
 
-# ---------------- LOAD DISEASE INFO ----------------
+# ---------------- DISEASE INFO ----------------
 with open("disease_info.json", "r") as f:
     disease_info = json.load(f)
 
-# ---------------- CLASS NAMES ----------------
 class_names = [
     "Tomato_Bacterial_spot",
     "Tomato_Early_blight",
@@ -35,31 +60,19 @@ def preprocess(image):
     image = np.expand_dims(image, axis=0)
     return image
 
-# ---------------- SIMPLE AI CHATBOT ----------------
-@st.cache_resource
-def load_chatbot():
-    return pipeline("text-generation", model="distilgpt2")
-
-chatbot = load_chatbot()
-
-def get_response(user_input):
-    result = chatbot(
-        user_input,
-        max_length=100,
-        num_return_sequences=1
-    )
-    return result[0]["generated_text"]
-
-# ---------------- SIDEBAR NAVIGATION ----------------
-page = st.sidebar.selectbox("Choose Page", ["🌿 Disease Detection", "🤖 AI Chatbot"])
+# ---------------- SIDEBAR ----------------
+page = st.sidebar.selectbox("Select Page", [
+    "🌿 Disease Detection",
+    "📡 Live Sensor Data",
+    "🤖 AI Chatbot"
+])
 
 # =====================================================
 # 🌿 PAGE 1 - DISEASE DETECTION
 # =====================================================
 if page == "🌿 Disease Detection":
 
-    st.title("🌿 Plant Disease Detection System")
-    st.write("Upload a leaf image to detect disease and get treatment info.")
+    st.title("🌿 Plant Disease Detection")
 
     uploaded_file = st.file_uploader("Upload Leaf Image", type=["jpg", "jpeg", "png"])
 
@@ -83,34 +96,44 @@ if page == "🌿 Disease Detection":
 
             st.subheader("🛡 Prevention")
             st.write(disease_info[predicted_class]["prevention"])
-        else:
-            st.warning("No disease info available.")
 
 # =====================================================
-# 🤖 PAGE 2 - CHATBOT
+# 📡 PAGE 2 - FIREBASE SENSOR DATA
+# =====================================================
+elif page == "📡 Live Sensor Data":
+
+    st.title("📡 Live Farm Sensor Data")
+
+    data = get_sensor_data()
+
+    if data:
+        st.metric("🌡 Temperature", f"{data['temperature']} °C")
+        st.metric("💧 Humidity", f"{data['humidity']} %")
+        st.metric("🌱 Soil Moisture", f"{data['soil_moisture']} %")
+    else:
+        st.warning("No sensor data available. Check Firebase connection.")
+
+# =====================================================
+# 🤖 PAGE 3 - CHATBOT
 # =====================================================
 elif page == "🤖 AI Chatbot":
 
-    st.title("🤖 AI Farming Chatbot")
-    st.write("Ask anything about plants, farming, or diseases.")
+    st.title("🤖 Farming AI Chatbot")
 
     if "chat" not in st.session_state:
         st.session_state.chat = []
 
-    # show chat history
     for msg in st.session_state.chat:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
-    user_input = st.chat_input("Ask something...")
+    user_input = st.chat_input("Ask anything...")
 
     if user_input:
 
-        # user message
         st.chat_message("user").write(user_input)
         st.session_state.chat.append({"role": "user", "content": user_input})
 
-        # bot response
         with st.spinner("Thinking..."):
             reply = get_response(user_input)
 
