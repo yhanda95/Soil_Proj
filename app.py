@@ -12,7 +12,7 @@ st.set_page_config(page_title="Plant Disease AI 🌿", layout="centered")
 genai.configure(api_key="AIzaSyC0LQ0I3H6nDWDVIJ8ZymMUUMvt-UGDLZY")  # replace this
 
 def query_gemini(question, disease):
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("models/gemini-1.5-flash")
 
     prompt = f"""
 You are an expert agriculture assistant.
