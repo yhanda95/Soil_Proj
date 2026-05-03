@@ -4,27 +4,33 @@ import numpy as np
 from PIL import Image
 import json
 
-from transformers import pipeline
-
 import firebase_admin
 from firebase_admin import credentials, db
 
-# ---------------- CONFIG ----------------
-st.set_page_config(page_title="Plant Disease Detection 🌿", layout="centered")
+from transformers import pipeline
 
-# ---------------- FIREBASE INIT ----------------
+# =====================================================
+# 🔥 CONFIG
+# =====================================================
+st.set_page_config(
+    page_title="Smart Agriculture System 🌿",
+    layout="centered"
+)
+
+# =====================================================
+# 🔥 FIREBASE INIT
+# =====================================================
 if not firebase_admin._apps:
 
-    firebase_config = dict(st.secrets["firebase"])
-    firebase_config["private_key"] = firebase_config["private_key"].replace("\\n", "\n")
-
-    cred = credentials.Certificate(firebase_config)
+    cred = credentials.Certificate(dict(st.secrets["firebase"]))
 
     firebase_admin.initialize_app(cred, {
-        "databaseURL": "https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/"
+        "databaseURL": "https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app"
     })
 
-# ---------------- GET LATEST SENSOR DATA ----------------
+# =====================================================
+# 📡 FIREBASE SENSOR DATA
+# =====================================================
 def get_sensor_data():
     try:
         ref = db.reference("sensor")
@@ -33,22 +39,25 @@ def get_sensor_data():
         if not data:
             return None
 
-        # Firebase has timestamp-like keys → get latest entry
-        latest_key = sorted(data.keys())[-1]
+        latest_key = max(data.keys(), key=lambda x: int(x))
         return data[latest_key]
 
     except Exception as e:
         st.error(f"Firebase Error: {e}")
         return None
 
-# ---------------- MODEL ----------------
+# =====================================================
+# 🌿 LOAD MODEL
+# =====================================================
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model("plant_disease_model.keras")
 
 model = load_model()
 
-# ---------------- DISEASE INFO ----------------
+# =====================================================
+# 📄 DISEASE INFO
+# =====================================================
 with open("disease_info.json", "r") as f:
     disease_info = json.load(f)
 
@@ -59,14 +68,18 @@ class_names = [
     "Tomato_healthy"
 ]
 
-# ---------------- PREPROCESS ----------------
+# =====================================================
+# 🧠 PREPROCESS IMAGE
+# =====================================================
 def preprocess(image):
     image = image.resize((224, 224))
-    image = np.array(image)
+    image = np.array(image) / 255.0
     image = np.expand_dims(image, axis=0)
     return image
 
-# ---------------- CHATBOT ----------------
+# =====================================================
+# 🤖 CHATBOT
+# =====================================================
 @st.cache_resource
 def load_chatbot():
     return pipeline("text-generation", model="distilgpt2")
@@ -74,13 +87,19 @@ def load_chatbot():
 chatbot = load_chatbot()
 
 def get_response(user_input):
-    result = chatbot(user_input, max_length=100, num_return_sequences=1)
+    result = chatbot(
+        user_input,
+        max_length=100,
+        num_return_sequences=1
+    )
     return result[0]["generated_text"]
 
-# ---------------- SIDEBAR ----------------
+# =====================================================
+# 📌 SIDEBAR NAVIGATION
+# =====================================================
 page = st.sidebar.selectbox(
-    "Choose Page",
-    ["🌿 Disease Detection", "🤖 AI Chatbot", "📡 Live Sensor Data"]
+    "Choose Module",
+    ["🌿 Disease Detection", "📡 Sensor Data", "🤖 AI Chatbot"]
 )
 
 # =====================================================
@@ -95,29 +114,50 @@ if page == "🌿 Disease Detection":
     if uploaded_file:
 
         image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="Uploaded Image")
+        st.image(image, caption="Uploaded Image", use_container_width=True)
 
         prediction = model.predict(preprocess(image))
 
-        label = class_names[np.argmax(prediction)]
+        predicted_class = class_names[np.argmax(prediction)]
         confidence = float(np.max(prediction))
 
-        st.subheader(f"Prediction: {label}")
+        st.subheader(f"🧠 Prediction: {predicted_class}")
         st.write(f"Confidence: {confidence*100:.2f}%")
 
-        if label in disease_info:
+        if predicted_class in disease_info:
             st.subheader("🦠 Cause")
-            st.write(disease_info[label]["cause"])
+            st.write(disease_info[predicted_class]["cause"])
 
             st.subheader("🛡 Prevention")
-            st.write(disease_info[label]["prevention"])
+            st.write(disease_info[predicted_class]["prevention"])
 
 # =====================================================
-# 🤖 CHATBOT
+# 📡 SENSOR DATA
+# =====================================================
+elif page == "📡 Sensor Data":
+
+    st.title("📡 Live Sensor Data")
+
+    data = get_sensor_data()
+
+    if data:
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("🌡 Temperature", f"{data.get('temp', 0)} °C")
+        col2.metric("💧 Humidity", f"{data.get('hum', 0)} %")
+        col3.metric("🌱 Soil Moisture", f"{data.get('soil', 0)}")
+
+    else:
+        st.warning("No sensor data found in Firebase")
+
+# =====================================================
+# 🤖 CHATBOT PAGE
 # =====================================================
 elif page == "🤖 AI Chatbot":
 
-    st.title("🤖 AI Farming Chatbot")
+    st.title("🤖 Farming AI Chatbot")
+    st.write("Ask anything about farming, plants, or diseases.")
 
     if "chat" not in st.session_state:
         st.session_state.chat = []
@@ -138,19 +178,3 @@ elif page == "🤖 AI Chatbot":
 
         st.chat_message("assistant").write(reply)
         st.session_state.chat.append({"role": "assistant", "content": reply})
-
-# =====================================================
-# 📡 SENSOR DATA
-# =====================================================
-elif page == "📡 Live Sensor Data":
-
-    st.title("📡 Live Farm Sensor Data")
-
-    data = get_sensor_data()
-
-    if data:
-        st.metric("🌡 Temperature", f"{data.get('temp', 0)} °C")
-        st.metric("💧 Humidity", f"{data.get('hum', 0)} %")
-        st.metric("🌱 Soil Moisture", f"{data.get('soil', 0)}")
-    else:
-        st.warning("No sensor data found in Firebase")
