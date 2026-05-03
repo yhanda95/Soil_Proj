@@ -14,7 +14,7 @@ st.set_page_config(page_title="Smart Agriculture AI 🌿🤖📡", layout="cente
 
 # ---------------- FIREBASE INIT ----------------
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_key.json")  # 🔥 your firebase key file
+    cred = credentials.Certificate(st.secrets["firebase"])  # 🔥 your firebase key file
 
     firebase_admin.initialize_app(cred, {
         "databaseURL": "https://soilproj-eac88-default-rtdb.europe-west1.firebasedatabase.app/"  # 🔥 replace this
